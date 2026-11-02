@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
-import { useLocation } from 'react-router'
+import { Link, useLocation } from 'react-router'
+import { useAuth } from '../hooks/useAuth'
+import { ApiError, apiRequest } from '../lib/api'
 import { ArrowLeft, ArrowRight, Check, CheckCircle2, CircleHelp, LockKeyhole, Menu, RotateCcw, X, Zap } from 'lucide-react'
 import { modules, levelForXp, type Lesson, type Module } from '../data/content'
 import '../App.css'
@@ -19,7 +21,22 @@ function readProgress(): Progress {
 
 export default function Home() {
   const isCoursesPage = useLocation().pathname === '/courses'
-  const [progress, setProgress] = useState<Progress>(readProgress)
+  const { user, logout } = useAuth()
+  const userId = user?.userId
+  // Guest progress lives in localStorage under STORAGE_KEY. Signed-in progress lives on the
+  // server and is never written to the guest key, so signing out restores the guest's own
+  // notebook instead of leaking the account's progress onto a shared device.
+  const [progress, setProgress] = useState<Progress>(() => userId ? emptyProgress : readProgress())
+  const [sessionUserId, setSessionUserId] = useState(userId)
+  const [loadedUserId, setLoadedUserId] = useState<string | null>(null)
+  const [syncError, setSyncError] = useState<string | null>(null)
+  if (sessionUserId !== userId) {
+    // Account changed (sign in/out) — reset during render so no effect sees mixed state.
+    setSessionUserId(userId)
+    setLoadedUserId(null)
+    setSyncError(null)
+    setProgress(userId ? emptyProgress : readProgress())
+  }
   const [activeModule, setActiveModule] = useState<Module | null>(null)
   const [activeLesson, setActiveLesson] = useState<Lesson | null>(null)
   const [quizMode, setQuizMode] = useState(false)
@@ -27,12 +44,43 @@ export default function Home() {
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null)
   const [quizScore, setQuizScore] = useState(0)
   const [quizFinished, setQuizFinished] = useState(false)
+  const [quizAnswers, setQuizAnswers] = useState<{ questionIndex: number; answer: number }[]>([])
   const [mobileNav, setMobileNav] = useState(false)
   const level = levelForXp(progress.xp)
   const totalLessons = modules.reduce((sum, module) => sum + module.lessons.length, 0)
   const completedCount = progress.lessons.length
   const overall = Math.round((completedCount / totalLessons) * 100)
-  useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(progress)) }, [progress])
+  useEffect(() => {
+    if (!userId) localStorage.setItem(STORAGE_KEY, JSON.stringify(progress))
+  }, [progress, userId])
+  useEffect(() => {
+    let cancelled = false
+    if (!userId) return
+    apiRequest<Progress>('/api/progress')
+      .then(saved => {
+        if (cancelled) return
+        setProgress({ xp: saved.xp, lessons: saved.lessons, badges: saved.badges })
+        // Only enable saving after a successful load, so a failed load never overwrites server progress.
+        setLoadedUserId(userId)
+      })
+      .catch(error => {
+        if (cancelled) return
+        if (error instanceof ApiError && (error.status === 401 || error.status === 403)) { logout(); return }
+        console.error('Could not load saved progress:', error)
+        setSyncError('Could not reach the progress server. Changes in this session will not be saved to your account.')
+      })
+    return () => { cancelled = true }
+  }, [userId, logout])
+  useEffect(() => {
+    if (!userId || loadedUserId !== userId) return
+    apiRequest('/api/progress', { method: 'POST', body: JSON.stringify({ progress }) })
+      .then(() => setSyncError(null))
+      .catch(error => {
+        if (error instanceof ApiError && (error.status === 401 || error.status === 403)) { logout(); return }
+        console.error('Could not save progress:', error)
+        setSyncError('Your latest progress has not been saved to your account yet.')
+      })
+  }, [progress, loadedUserId, userId, logout])
   useEffect(() => {
     if (!activeModule) return
     const onKey = (event: KeyboardEvent) => {
@@ -46,26 +94,42 @@ export default function Home() {
   function startModule(module: Module, lesson?: Lesson) {
     setActiveModule(module)
     setActiveLesson(lesson ?? module.lessons.find(item => !progress.lessons.includes(item.id)) ?? module.lessons[0])
-    setQuizMode(false); setQuestionIndex(0); setSelectedAnswer(null); setQuizScore(0); setQuizFinished(false)
+    setQuizMode(false); setQuestionIndex(0); setSelectedAnswer(null); setQuizScore(0); setQuizFinished(false); setQuizAnswers([])
   }
   function closeLearning() { setActiveModule(null); setActiveLesson(null); setQuizMode(false) }
   function completeLesson() {
     if (!activeLesson || !activeModule) return
-    if (!progress.lessons.includes(activeLesson.id)) setProgress(current => ({ ...current, xp: current.xp + activeLesson.xp, lessons: [...current.lessons, activeLesson.id] }))
     const next = activeModule.lessons[activeModule.lessons.findIndex(item => item.id === activeLesson.id) + 1]
     if (next) setActiveLesson(next)
     else { setActiveLesson(null); setQuizMode(true) }
   }
   function answerQuestion() {
     if (!activeModule || selectedAnswer === null) return
-    const correct = selectedAnswer === activeModule.quiz[questionIndex].answer
-    const score = quizScore + (correct ? 1 : 0)
-    setQuizScore(score)
-    if (questionIndex + 1 < activeModule.quiz.length) { setQuestionIndex(questionIndex + 1); setSelectedAnswer(null) }
-    else {
+    const isCorrect = selectedAnswer === activeModule.quiz[questionIndex].answer
+    const newScore = quizScore + (isCorrect ? 1 : 0)
+    setQuizScore(newScore)
+    
+    const newAnswers = [...quizAnswers, { questionIndex, answer: selectedAnswer! }]
+    setQuizAnswers(newAnswers)
+
+    if (questionIndex + 1 < activeModule.quiz.length) { 
+      setQuestionIndex(questionIndex + 1)
+      setSelectedAnswer(null) 
+    } else {
       setQuizFinished(true)
-      if (score >= Math.ceil(activeModule.quiz.length * 0.75) && !progress.badges.includes(activeModule.badge.id)) {
-        setProgress(current => ({ ...current, xp: current.xp + 100, badges: [...current.badges, activeModule.badge.id] }))
+      const passingScore = Math.ceil(activeModule.quiz.length * 0.75)
+      if (newScore >= passingScore) {
+        setProgress(current => {
+          const newLessons = activeModule.lessons.filter(lesson => !current.lessons.includes(lesson.id))
+          const lessonXp = newLessons.reduce((sum, lesson) => sum + lesson.xp, 0)
+          const earnedNewBadge = !current.badges.includes(activeModule.badge.id)
+          if (newLessons.length === 0 && !earnedNewBadge) return current
+          return {
+            xp: current.xp + lessonXp + (earnedNewBadge ? 100 : 0),
+            lessons: [...current.lessons, ...newLessons.map(lesson => lesson.id)],
+            badges: earnedNewBadge ? [...current.badges, activeModule.badge.id] : current.badges,
+          }
+        })
       }
     }
   }
@@ -75,9 +139,10 @@ export default function Home() {
     <header className="guide-header">
       <a className="wordmark" href="/"><span className="wordmark-icon">f.</span><span>FIELDNOTES <em>/ AI</em></span></a>
       <button className="mobile-menu" aria-label="Toggle navigation" onClick={() => setMobileNav(!mobileNav)}>{mobileNav ? <X /> : <Menu />}</button>
-      <nav className={mobileNav ? 'guide-nav nav-open' : 'guide-nav'} aria-label="Main navigation"><a href={isCoursesPage ? '#chapters' : '/courses#chapters'} onClick={() => setMobileNav(false)}>Courses</a><a href={isCoursesPage ? '/#progress' : '#progress'} onClick={() => setMobileNav(false)}>My progress</a><a href={isCoursesPage ? '#stamps' : '/courses#stamps'} onClick={() => setMobileNav(false)}>Badges</a></nav>
+      <nav className={mobileNav ? 'guide-nav nav-open' : 'guide-nav'} aria-label="Main navigation"><a href={isCoursesPage ? '#chapters' : '/courses#chapters'} onClick={() => setMobileNav(false)}>Courses</a><a href={isCoursesPage ? '/#progress' : '#progress'} onClick={() => setMobileNav(false)}>My progress</a><a href={isCoursesPage ? '#stamps' : '/courses#stamps'} onClick={() => setMobileNav(false)}>Badges</a>{user ? <button type="button" className="nav-account" onClick={() => { setMobileNav(false); logout() }}>Sign out <span>({user.username})</span></button> : <Link className="nav-account" to="/login" onClick={() => setMobileNav(false)}>Sign in</Link>}</nav>
       <div className="issue-mark">STUDENT EDITION <span>·</span> VOL. 01</div>
     </header>
+    {syncError && <p className="sync-notice" role="status">{syncError}</p>}
 
     {!isCoursesPage && <section className="field-hero">
       <div className="hero-copy"><div className="issue-line"><span>FIELD GUIDE Nº 01</span><span>ARTIFICIAL INTELLIGENCE</span></div>
@@ -100,18 +165,12 @@ export default function Home() {
         <div className="diagram-caption"><span>1 / 3</span><p>A model spots patterns in examples. It doesn’t understand a cat the way you do.</p></div><span className="pencil-note">the important bit →</span>
       </div>
       <div className="hero-footerline"><span>LOOK CLOSELY. ASK BETTER QUESTIONS.</span><span>EST. FOR THE CURIOUS <b>✳</b></span></div>
-    </section>
-
-    
-
-
-
-    }
+    </section>}
 
     <section className="progress-ruler" id="progress" aria-label="Learning progress"><div className="ruler-intro"><span className="section-index">YOUR FIELD LOG</span><strong>{progress.xp.toLocaleString()} <small>XP</small></strong></div><div className="ruler-track-wrap"><div className="ruler-heading"><span>{completedCount} OF {totalLessons} LESSONS IN THE NOTEBOOK</span><span>LEVEL {level.level} · {level.intoLevel}/300 XP</span></div><div className="ruler-track"><i style={{ width: `${overall}%` }} />{[0, 25, 50, 75, 100].map(value => <span key={value} style={{ left: `${value}%` }} />)}</div><div className="ruler-labels"><span>JUST STARTING</span><span>AI LITERATE</span></div></div><div className="ruler-badges"><b>{badgeCount}</b><span>BADGES<br />STAMPED</span></div></section>
 
     {isCoursesPage && <section className="course-page-heading"><div className="section-index">THE FIELD GUIDE / COURSE INDEX</div><h1>Choose a place<br/>to <em>begin.</em></h1><p>Three short courses, nine lessons, and a knowledge check at the end of each.</p></section>}
-    {!isCoursesPage && <section className="course-overview" id="course-overview"><div className="section-index">AT A GLANCE / THREE COURSES</div><h2>What each course teaches.</h2><div className="overview-list"><article><h3>01 / AI Fundamentals</h3><p>AI vs. rule-based software; training data and machine learning; neural networks and language models; overfitting, generalization, and AI in daily life.</p></article><article><h3>02 / Tools & Techniques</h3><p>The CLEAR prompting framework; Socratic tutoring and practice tests; useful feedback; hallucinations and source verification.</p></article><article><h3>03 / Ethics & Responsibility</h3><p>Academic integrity and disclosure; bias and fairness; privacy; deepfakes and misinformation; environmental impact and human accountability.</p></article></div><a className="ink-button" href="/courses#chapters">Browse course lessons <ArrowRight size={16}/></a></section>}
+    {!isCoursesPage && <section className="course-overview" id="course-overview"><div className="section-index">AT A GLANCE / THREE COURSES</div><h2>What each course teaches.</h2><div className="overview-list"><article><h3>01 / AI Fundamentals</h3><p>AI compared with rule-based software, training data, machine learning, neural networks, language models, overfitting, generalization, and AI in daily life.</p></article><article><h3>02 / Tools & Techniques</h3><p>The CLEAR prompting framework, Socratic tutoring, practice tests, useful feedback, hallucinations, and source verification.</p></article><article><h3>03 / Ethics & Responsibility</h3><p>Academic integrity and disclosure, bias and fairness, privacy, deepfakes, misinformation, environmental impact, and human accountability.</p></article></div><a className="ink-button" href="/courses#chapters">Browse course lessons <ArrowRight size={16}/></a></section>}
     <section className="chapter-section" id="chapters"><div className="chapter-heading"><div><div className="section-index">THE READING LIST</div><h2>Three chapters.<br /><em>One smarter you.</em></h2></div><p>Follow the chapters in order or jump to the question you have right now. Each one has short lessons and a knowledge check.</p></div>
       <div className="chapter-list">{modules.map((module, index) => {
         const done = module.lessons.filter(lesson => progress.lessons.includes(lesson.id)).length
@@ -136,7 +195,7 @@ export default function Home() {
     <footer className="guide-footer"><a className="wordmark" href="#top"><span className="wordmark-icon">f.</span><span>FIELDNOTES <em>/ AI</em></span></a><span>Made for students who ask why.</span><span>THINK FOR YOURSELF. USE TOOLS WELL.</span></footer>
 
     {activeModule && <div className="modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) closeLearning() }}><section className="learning-modal" role="dialog" aria-modal="true" aria-labelledby="lesson-title"><header className="modal-header"><button className="modal-back" onClick={closeLearning}><ArrowLeft size={16}/> <span>Notebook</span></button><div className="modal-progress-wrap"><span>{quizMode ? 'KNOWLEDGE CHECK' : activeLesson ? `LESSON ${activeModule.lessons.findIndex(item => item.id === activeLesson.id) + 1} OF ${activeModule.lessons.length}` : 'CHAPTER COMPLETE'}</span><div className="modal-progress"><i style={{ width: `${quizMode ? (quizFinished ? 100 : ((questionIndex + 1) / activeModule.quiz.length) * 100) : activeLesson ? ((activeModule.lessons.findIndex(item => item.id === activeLesson.id) + 1) / (activeModule.lessons.length + 1)) * 100 : 100}%` }}/></div></div><button className="modal-close" aria-label="Close" onClick={closeLearning}><X size={19}/></button></header>
-      <div className="modal-body">{quizMode ? <div className="quiz-content">{quizFinished ? <div className="quiz-result"><div className="result-icon">{quizScore >= Math.ceil(activeModule.quiz.length * .75) ? <Check size={30}/> : <RotateCcw size={30}/>}</div><div className="section-index">{quizScore >= Math.ceil(activeModule.quiz.length * .75) ? 'CHAPTER STAMP EARNED' : 'KEEP PRACTICING'}</div><h2>{quizScore >= Math.ceil(activeModule.quiz.length * .75) ? 'Well observed.' : 'Back to the notes.'}</h2><p>You got <b>{quizScore} out of {activeModule.quiz.length}</b> correct. {quizScore >= Math.ceil(activeModule.quiz.length * .75) ? `You earned the ${activeModule.badge.name} stamp and 100 bonus XP.` : 'Review the lessons and give the knowledge check another try.'}</p>{quizScore >= Math.ceil(activeModule.quiz.length * .75) ? <button className="ink-button" onClick={closeLearning}>Back to my notebook <ArrowRight size={16}/></button> : <button className="ink-button" onClick={() => { setQuestionIndex(0); setSelectedAnswer(null); setQuizScore(0); setQuizFinished(false) }}>Try again <RotateCcw size={15}/></button>}</div> : <><div className="section-index">{activeModule.title.toUpperCase()} · QUICK CHECK</div><div className="question-count">QUESTION {questionIndex + 1} <span>/ {activeModule.quiz.length}</span></div><h2 className="quiz-question">{activeModule.quiz[questionIndex].question}</h2><div className="answer-options">{activeModule.quiz[questionIndex].options.map((option, index) => <button key={option} className={`answer-option ${selectedAnswer === index ? 'answer-selected' : ''}`} onClick={() => setSelectedAnswer(index)}><span className="answer-letter">{String.fromCharCode(65 + index)}</span>{option}<span className="answer-radio"/></button>)}</div><button className="ink-button quiz-submit" disabled={selectedAnswer === null} onClick={answerQuestion}>Check answer <ArrowRight size={16}/></button></>}</div> : activeLesson ? <article className="lesson-content"><div className="section-index">{activeModule.title.toUpperCase()} · {activeLesson.minutes} MIN READ</div><h1 id="lesson-title">{activeLesson.title}</h1><div className="lesson-xp"><Zap size={13}/> +{activeLesson.xp} XP · STAMP THIS PAGE WHEN FINISHED</div><div className="lesson-body">{activeLesson.body.map((section, index) => <div className="lesson-paragraph" key={`${activeLesson.id}-${index}`}>{section.heading && <h3>{section.heading}</h3>}<p>{section.text}</p></div>)}</div><button className="ink-button lesson-next" onClick={completeLesson}>{activeModule.lessons.findIndex(item => item.id === activeLesson.id) === activeModule.lessons.length - 1 ? 'Finish chapter & take the check' : 'Mark read & turn the page'} <ArrowRight size={16}/></button></article> : <div className="quiz-result"><div className="result-icon">✓</div><div className="section-index">CHAPTER COMPLETE</div><h2>Good work.</h2><p>You finished every lesson. Take the chapter check to earn your field stamp.</p><button className="ink-button" onClick={() => setQuizMode(true)}>Start knowledge check <CircleHelp size={16}/></button></div>}</div>
+      <div className="modal-body">{quizMode ? <div className="quiz-content">{quizFinished ? <div className="quiz-result"><div className="result-icon">{quizScore >= Math.ceil(activeModule.quiz.length * .75) ? <Check size={30}/> : <RotateCcw size={30}/>}</div><div className="section-index">{quizScore >= Math.ceil(activeModule.quiz.length * .75) ? 'CHAPTER STAMP EARNED · PROGRESS UPDATED' : 'KEEP PRACTICING · PROGRESS UNCHANGED'}</div><h2>{quizScore >= Math.ceil(activeModule.quiz.length * .75) ? 'Well observed.' : 'Back to the notes.'}</h2><p>You got <b>{quizScore} out of {activeModule.quiz.length}</b> correct. {quizScore >= Math.ceil(activeModule.quiz.length * .75) ? `You got at least 3 out of the 4 questions right, so your progress meter went up and you earned the ${activeModule.badge.name} stamp and 100 bonus XP.` : 'You must get at least 3 out of the 4 questions right for your progress meter to go up. Review the lessons and give the knowledge check another try.'}</p>{quizScore >= Math.ceil(activeModule.quiz.length * .75) ? <button className="ink-button" onClick={closeLearning}>Back to my notebook <ArrowRight size={16}/></button> : <button className="ink-button" onClick={() => { setQuestionIndex(0); setSelectedAnswer(null); setQuizScore(0); setQuizFinished(false); setQuizAnswers([]) }}>Try again <RotateCcw size={15}/></button>}</div> : <><div className="section-index">{activeModule.title.toUpperCase()} · QUICK CHECK</div><div className="question-count">QUESTION {questionIndex + 1} <span>/ {activeModule.quiz.length}</span></div><h2 className="quiz-question">{activeModule.quiz[questionIndex].question}</h2><div className="answer-options">{activeModule.quiz[questionIndex].options.map((option, index) => <button key={option} className={`answer-option ${selectedAnswer === index ? 'answer-selected' : ''}`} onClick={() => setSelectedAnswer(index)}><span className="answer-letter">{String.fromCharCode(65 + index)}</span>{option}<span className="answer-radio"/></button>)}</div><button className="ink-button quiz-submit" disabled={selectedAnswer === null} onClick={answerQuestion}>Check answer <ArrowRight size={16}/></button></>}</div> : activeLesson ? <article className="lesson-content"><div className="section-index">{activeModule.title.toUpperCase()} · {activeLesson.minutes} MIN READ</div><h1 id="lesson-title">{activeLesson.title}</h1><div className="lesson-xp"><Zap size={13}/> +{activeLesson.xp} XP · PASS CHAPTER CHECK (3/4) TO RECORD PROGRESS</div><div className="lesson-body">{activeLesson.body.map((section, index) => <div className="lesson-paragraph" key={`${activeLesson.id}-${index}`}>{section.heading && <h3>{section.heading}</h3>}<p>{section.text}</p></div>)}</div><button className="ink-button lesson-next" onClick={completeLesson}>{activeModule.lessons.findIndex(item => item.id === activeLesson.id) === activeModule.lessons.length - 1 ? 'Finish chapter & take the check' : 'Mark read & turn the page'} <ArrowRight size={16}/></button></article> : <div className="quiz-result"><div className="result-icon">✓</div><div className="section-index">CHAPTER COMPLETE</div><h2>Good work.</h2><p>You finished every lesson. Get at least 3 out of 4 questions right on the chapter check for your progress meter to go up and to earn your field stamp.</p><button className="ink-button" onClick={() => setQuizMode(true)}>Start knowledge check <CircleHelp size={16}/></button></div>}</div>
     </section></div>}
   </main>
 }
