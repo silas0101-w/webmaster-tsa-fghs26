@@ -1,0 +1,21 @@
+{
+  "0": "pagination.tsx",
+  "1": "carousel.tsx",
+  "6": "field.tsx",
+  "7": "app/package.json",
+  "8": "utils.ts",
+  "12": "eslint.config.js",
+  "18": "alert-dialog.tsx",
+  "28": "input-otp.tsx",
+  "30": "accordion.tsx",
+  "31": "class-variance-authority",
+  "44": "popover.tsx",
+  "45": "radio-group.tsx",
+  "46": "input-group.tsx",
+  "47": "avatar.tsx",
+  "48": "hover-card.tsx",
+  "49": "scroll-area.tsx",
+  "50": "alert.tsx",
+  "51": "resizable.tsx",
+  "52": "Input"
+}

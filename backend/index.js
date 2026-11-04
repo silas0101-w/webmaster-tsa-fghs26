@@ -94,10 +94,27 @@ app.post('/api/progress', authenticate, async (req, res) => {
   if (!progress || !Number.isInteger(progress.xp) || progress.xp < 0 || !Array.isArray(progress.lessons) || !Array.isArray(progress.badges)) {
     return res.status(400).json({ error: 'Progress must include non-negative XP and lesson and badge lists' });
   }
+  const hasVideoProgress = progress.videoProgress !== undefined && progress.videoProgress !== null;
+  if (hasVideoProgress && (typeof progress.videoProgress !== 'object' || Array.isArray(progress.videoProgress))) {
+    return res.status(400).json({ error: 'videoProgress must be an object mapping lesson IDs to percentages' });
+  }
+  const sanitizedVideoProgress = hasVideoProgress
+    ? Object.fromEntries(
+        Object.entries(progress.videoProgress)
+          .filter(([key, val]) => typeof key === 'string' && typeof val === 'number' && Number.isFinite(val))
+          .map(([key, val]) => [key, Math.max(0, Math.min(100, Math.round(val)))])
+      )
+    : null;
   try {
-      await getDb().run(
-      'INSERT INTO progress (userId, xp, lessons, badges) VALUES (?, ?, ?, ?) ON CONFLICT(userId) DO UPDATE SET xp=excluded.xp, lessons=excluded.lessons, badges=excluded.badges',
-      [req.userId, progress.xp, JSON.stringify(progress.lessons), JSON.stringify(progress.badges)]
+    await getDb().run(
+      'INSERT INTO progress (userId, xp, lessons, badges, videoProgress) VALUES (?, ?, ?, ?, ?) ON CONFLICT(userId) DO UPDATE SET xp=excluded.xp, lessons=excluded.lessons, badges=excluded.badges, videoProgress=COALESCE(excluded.videoProgress, progress.videoProgress)',
+      [
+        req.userId,
+        progress.xp,
+        JSON.stringify(progress.lessons),
+        JSON.stringify(progress.badges),
+        sanitizedVideoProgress ? JSON.stringify(sanitizedVideoProgress) : null,
+      ]
     );
     res.json({ message: 'Progress saved', progress });
   } catch (err) {
@@ -107,13 +124,17 @@ app.post('/api/progress', authenticate, async (req, res) => {
 
 app.get('/api/progress', authenticate, async (req, res) => {
   try {
-    const row = await getDb().get('SELECT xp, lessons, badges FROM progress WHERE userId = ?', [req.userId]);
+    const row = await getDb().get('SELECT xp, lessons, badges, videoProgress FROM progress WHERE userId = ?', [req.userId]);
     if (row) {
-      res.json({
+      const payload = {
         xp: row.xp,
         lessons: JSON.parse(row.lessons),
-        badges: JSON.parse(row.badges)
-      });
+        badges: JSON.parse(row.badges),
+      };
+      if (row.videoProgress) {
+        payload.videoProgress = JSON.parse(row.videoProgress);
+      }
+      res.json(payload);
     } else {
       res.json({ xp: 0, lessons: [], badges: [] });
     }

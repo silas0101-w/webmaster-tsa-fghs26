@@ -1,0 +1,125 @@
+:root{font-family:Arial,Helvetica,sans-serif;color:#202b3b;background:#f4f0e5;font-synthesis:none;text-rendering:optimizeLegibility;-webkit-font-smoothing:antialiased;--paper:#f4f0e5;--paper-light:#fbf8ef;--ink:#202b3b;--blue:#263f72;--red:#d94d38;--gold:#e5c665;--rule:#c9c3b2;--sub:#777567}
+.quiz-review {
+  margin-top: 32px;
+  padding: 24px;
+  background: var(--paper-light);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+}
+.quiz-review-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+}
+.quiz-review-item {
+  padding: 12px;
+  border-left: 4px solid var(--rule);
+  background: var(--paper);
+}
+.quiz-review-item.correct { border-left-color: var(--blue); }
+.quiz-review-item.incorrect { border-left-color: var(--red); }
+.review-letter {
+  font-weight: bold;
+  margin-right: 8px;
+  font-size: 0.9rem;
+}
+.review-status {
+  font-size: 0.85rem;
+  margin-top: 4px;
+  opacity: 0.8;
+}
+*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:72px}body{margin:0;min-width:350px;background:var(--paper)}button,a{font:inherit}button{cursor:pointer}a{color:inherit;text-decoration:none}.field-guide{max-width:1180px;margin:auto;padding:0 42px;background:var(--paper);overflow:hidden}.guide-header{height:61px;border-bottom:1px solid var(--ink);display:flex;align-items:center}
+.home-page .chapter-section,.home-page .margin-note,.home-page .stamp-section{display:none}.course-page-heading{padding:58px 8px 38px;border-bottom:1px solid var(--ink)}.course-page-heading h1{font:700 clamp(48px,7vw,76px)/.96 Georgia,serif;letter-spacing:-3px;color:var(--blue);margin:14px 0}.course-page-heading h1 em{color:var(--red);font-weight:400}.course-page-heading p{max-width:440px;font:15p<content omitted. Read with read_file_chars(path="app/src/App.css", start_char=1322, chars_to_read=16515)>
+
+.home-page .chapter-section,.home-page .margin-note,.home-page .stamp-section{display:none}.course-page-heading{padding:58px 8px 38px;border-bottom:1px solid var(--ink)}.course-page-heading h1{font:700 clamp(48px,7vw,76px)/.96 Georgia,serif;letter-spacing:-3px;color:var(--blue);margin:14px 0}.course-page-heading h1 em{color:var(--red);font-weight:400}.course-page-heading p{max-width:440px;font:15p<content omitted. Read with read_file_chars(path="app/src/App.css", start_char=18239, chars_to_read=948)>
+.auth-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 80vh;
+  padding: 42px;
+}
+.auth-card {
+  background: var(--paper-light);
+  padding: 48px;
+  max-width: 400px;
+  width: 100%;
+  border: 1px solid var(--rule);
+  box-shadow: 8px 8px 0px var(--rule);
+}
+.auth-header {
+  margin-bottom: 32px;
+}
+.auth-title-login {
+  font: 800 48px/1.1 Georgia, serif;
+  color: var(--blue);
+  margin-bottom: 8px;
+}
+.auth-title-signup {
+  font: 800 48px/1.1 Georgia, serif;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+.auth-subtitle {
+  font: 14px/1.4 sans-serif;
+  color: var(--sub);
+  margin: 0;
+}
+.auth-form .form-group {
+  margin-bottom: 20px;
+}
+.auth-form label {
+  display: block;
+  font-weight: bold;
+  font-size: 12px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  color: var(--ink);
+}
+.auth-form input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--rule);
+  background: var(--paper);
+  font: 14px/1.4 sans-serif;
+}
+.auth-error {
+  color: var(--red);
+  font-size: 13px;
+  margin-bottom: 16px;
+  padding: 8px;
+  border: 1px solid var(--red);
+  background: rgba(217, 77, 56, 0.05);
+}
+.auth-button {
+  width: 100%;
+  padding: 14px;
+  background: var(--blue);
+  color: white;
+  border: none;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-top: 16px;
+}
+.auth-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.auth-footer {
+  margin-top: 24px;
+  font-size: 14px;
+  text-align: center;
+  color: var(--sub);
+}
+.auth-toggle {
+  background: none;
+  border: none;
+  text-decoration: underline;
+  cursor: pointer;
+  color: var(--blue);
+  padding: 0;
+  font-weight: bold;
+}
+```

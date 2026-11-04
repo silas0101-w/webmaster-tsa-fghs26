@@ -42,3 +42,8 @@ model.md
 
 # made by model
 %TEMP%h.css
+# Agent toolchains and customizations
+.agents/
+.agent/
+.gemini/
+.gemeni/

@@ -27,9 +27,15 @@ async function initDb() {
       xp INTEGER DEFAULT 0,
       lessons TEXT,
       badges TEXT,
+      videoProgress TEXT,
       FOREIGN KEY (userId) REFERENCES users (id) ON DELETE CASCADE
     )
   `);
+
+  const columns = await db.all('PRAGMA table_info(progress)');
+  if (!columns.some(col => col.name === 'videoProgress')) {
+    await db.exec('ALTER TABLE progress ADD COLUMN videoProgress TEXT');
+  }
 
   return db;
 }
