@@ -39,16 +39,22 @@ app.get('/api/health', async (req, res) => {
 app.post('/api/auth/signup', async (req, res) => {
   const username = typeof req.body?.username === 'string' ? req.body.username.trim() : '';
   const password = typeof req.body?.password === 'string' ? req.body.password : '';
+  const name = typeof req.body?.name === 'string' && req.body.name.trim().length > 0
+    ? req.body.name.trim()
+    : null;
   if (!username || password.length < 8) {
     return res.status(400).json({ error: 'Username is required and password must be at least 8 characters' });
   }
   if (username.length > 40 || password.length > 200) {
     return res.status(400).json({ error: 'Username must be 40 characters or fewer and password must be 200 characters or fewer' });
   }
+  if (name && name.length > 100) {
+    return res.status(400).json({ error: 'Name must be 100 characters or fewer' });
+  }
   try {
     const hashedPassword = await bcrypt.hash(password, 12);
     const id = crypto.randomUUID();
-    await getDb().run('INSERT INTO users (id, username, password) VALUES (?, ?, ?)', [id, username, hashedPassword]);
+    await getDb().run('INSERT INTO users (id, username, password, name) VALUES (?, ?, ?, ?)', [id, username, hashedPassword, name]);
     res.status(201).json({ message: 'User created', userId: id });
   } catch (err) {
     if (err.code === 'SQLITE_CONSTRAINT' || err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
@@ -63,10 +69,10 @@ app.post('/api/auth/login', async (req, res) => {
   const password = typeof req.body?.password === 'string' ? req.body.password : '';
   if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
   try {
-    const user = await getDb().get('SELECT id, password FROM users WHERE username = ?', [username]);
+    const user = await getDb().get('SELECT id, password, name FROM users WHERE username = ?', [username]);
     if (user && await bcrypt.compare(password, user.password)) {
       const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
-      res.json({ message: 'Login successful', token, userId: user.id });
+      res.json({ message: 'Login successful', token, userId: user.id, name: user.name ?? null });
     } else {
       res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -85,9 +91,133 @@ const authenticate = (req, res, next) => {
   jwt.verify(token, JWT_SECRET, (err, decoded) => {
     if (err) return res.status(403).json({ error: 'Invalid or expired token' });
     req.userId = decoded.userId;
+    req.user = { id: decoded.userId };
     next();
   });
 };
+
+app.get('/api/user/profile', authenticate, async (req, res) => {
+  try {
+    const userId = req.user?.id || req.userId;
+    const user = await getDb().get('SELECT id, username, name FROM users WHERE id = ?', [userId]);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.json({
+      user: {
+        id: user.id,
+        username: user.username,
+        name: user.name ?? null,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Could not load user profile' });
+  }
+});
+
+app.put('/api/user/profile', authenticate, async (req, res) => {
+  const userId = req.user?.id || req.userId;
+  const username = typeof req.body?.username === 'string' ? req.body.username.trim() : '';
+  const currentPassword = typeof req.body?.currentPassword === 'string' ? req.body.currentPassword : '';
+
+  if (!currentPassword) {
+    return res.status(401).json({ error: 'Current password is required and must be correct' });
+  }
+
+  if (!username) {
+    return res.status(400).json({ error: 'Username is required' });
+  }
+
+  if (username.length > 40) {
+    return res.status(400).json({ error: 'Username must be 40 characters or fewer' });
+  }
+
+  if (typeof req.body?.name === 'string' && req.body.name.trim().length > 100) {
+    return res.status(400).json({ error: 'Name must be 100 characters or fewer' });
+  }
+
+  try {
+    const user = await getDb().get('SELECT id, password, name FROM users WHERE id = ?', [userId]);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ error: 'Current password is required and must be correct' });
+    }
+
+    const existingUser = await getDb().get(
+      'SELECT id FROM users WHERE username = ? AND id != ?',
+      [username, userId]
+    );
+    if (existingUser) {
+      return res.status(409).json({ error: 'Username already taken' });
+    }
+
+    const name = typeof req.body?.name === 'string'
+      ? req.body.name.trim()
+      : (req.body?.name === null ? null : (user.name ?? null));
+
+    await getDb().run(
+      'UPDATE users SET name = ?, username = ? WHERE id = ?',
+      [name, username, userId]
+    );
+
+    res.json({
+      user: {
+        id: userId,
+        username,
+        name,
+      },
+    });
+  } catch (err) {
+    if (err.code === 'SQLITE_CONSTRAINT' || err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+      return res.status(409).json({ error: 'Username already taken' });
+    }
+    res.status(500).json({ error: 'Could not update profile' });
+  }
+});
+
+app.post('/api/user/change-password', authenticate, async (req, res) => {
+  const userId = req.user?.id || req.userId;
+  const currentPassword = typeof req.body?.currentPassword === 'string' ? req.body.currentPassword : '';
+  const newPassword = typeof req.body?.newPassword === 'string' ? req.body.newPassword : '';
+
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: 'Current password and new password are required' });
+  }
+
+  if (newPassword.length < 8) {
+    return res.status(400).json({ error: 'New password must be at least 8 characters' });
+  }
+
+  if (newPassword.length > 200) {
+    return res.status(400).json({ error: 'New password must be 200 characters or fewer' });
+  }
+
+  try {
+    const user = await getDb().get('SELECT id, password FROM users WHERE id = ?', [userId]);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+    await getDb().run('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, userId]);
+
+    res.json({
+      success: true,
+      message: 'Password updated successfully',
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Could not update password' });
+  }
+});
 
 app.post('/api/progress', authenticate, async (req, res) => {
   const progress = req.body?.progress;

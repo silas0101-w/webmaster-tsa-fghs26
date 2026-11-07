@@ -29,3 +29,46 @@ export async function apiRequest<T>(endpoint: string, options: RequestInit = {})
 
   return response.json()
 }
+
+export interface UserProfileResponse {
+  user: {
+    id: string
+    username: string
+    name: string | null
+  }
+}
+
+export interface UpdateProfileData {
+  username: string
+  name?: string | null
+  currentPassword: string
+}
+
+export interface ChangePasswordData {
+  currentPassword: string
+  newPassword: string
+}
+
+export interface ChangePasswordResponse {
+  success: boolean
+  message: string
+}
+
+export async function getProfile(): Promise<UserProfileResponse> {
+  return apiRequest<UserProfileResponse>('/api/user/profile')
+}
+
+export async function updateProfile(data: UpdateProfileData): Promise<UserProfileResponse> {
+  return apiRequest<UserProfileResponse>('/api/user/profile', {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function changePassword(data: ChangePasswordData): Promise<ChangePasswordResponse> {
+  return apiRequest<ChangePasswordResponse>('/api/user/change-password', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+

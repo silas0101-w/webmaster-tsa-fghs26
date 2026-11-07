@@ -1,8 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useLocation } from 'react-router'
+import { Link, useLocation, useNavigate } from 'react-router'
 import { useAuth } from '../hooks/useAuth'
 import { ApiError, apiRequest } from '../lib/api'
 import { ArrowRight, Check, CheckCircle2, Film, LockKeyhole, Menu, X } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu'
 import LessonModal, { type LessonViewMode } from '../components/LessonModal'
 import ProgressPage from '../components/ProgressPage'
 import BadgesPage, { buildBadgeCatalog } from '../components/BadgesPage'
@@ -47,6 +54,7 @@ function readProgress(): Progress {
 }
 
 export default function Home() {
+  const navigate = useNavigate()
   const pathname = useLocation().pathname
   const isCoursesPage = pathname === '/courses'
   const isProgressPage = pathname === '/progress'
@@ -269,16 +277,35 @@ export default function Home() {
             Badges
           </Link>
           {user ? (
-            <button
-              type="button"
-              className="nav-account"
-              onClick={() => {
-                setMobileNav(false)
-                logout()
-              }}
-            >
-              Sign out <span>({user.username})</span>
-            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button type="button" className="nav-account">
+                  Sign out <span>({user.username})</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="nav-dropdown-content">
+                <DropdownMenuItem
+                  className="nav-dropdown-item"
+                  onSelect={() => {
+                    setMobileNav(false)
+                    navigate('/account')
+                  }}
+                >
+                  Account
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="nav-dropdown-separator" />
+                <DropdownMenuItem
+                  variant="destructive"
+                  className="nav-dropdown-item nav-dropdown-item-destructive"
+                  onSelect={() => {
+                    setMobileNav(false)
+                    logout()
+                  }}
+                >
+                  Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           ) : (
             <Link className="nav-account" to="/login" onClick={() => setMobileNav(false)}>
               Sign in

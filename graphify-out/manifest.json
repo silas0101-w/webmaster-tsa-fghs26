@@ -30,9 +30,9 @@
     "semantic_hash": "ef3ba2a81ba19f8ea5ddf625521e96f0"
   },
   "app/src/App.tsx": {
-    "mtime": 1793760767.5119214,
-    "seen": 1793760900.5257251,
-    "ast_hash": "64a89890acb4e87a6daa1064b799bec2",
+    "mtime": 1793991973.7407317,
+    "seen": 1793992281.6728446,
+    "ast_hash": "ad9f6569bd2b6adc74dfc8a07164826a",
     "semantic_hash": ""
   },
   "app/src/components/auth/Auth.tsx": {
@@ -372,16 +372,16 @@
     "semantic_hash": "209b5193af16624cdd89d3591480dd48"
   },
   "app/src/hooks/useAuth.tsx": {
-    "mtime": 1793549569.4713752,
-    "seen": 1793748457.9129002,
-    "ast_hash": "6830e80678b9ee94dbcd503134e548a5",
-    "semantic_hash": "6830e80678b9ee94dbcd503134e548a5"
+    "mtime": 1793990469.5212371,
+    "seen": 1793992281.673317,
+    "ast_hash": "d3ce97ca7af89fe9ccac3da4c3b85b6b",
+    "semantic_hash": ""
   },
   "app/src/lib/api.ts": {
-    "mtime": 1793549474.2394538,
-    "seen": 1793748457.912906,
-    "ast_hash": "71d0cd708a92eb3eb9e705d787a02bab",
-    "semantic_hash": "71d0cd708a92eb3eb9e705d787a02bab"
+    "mtime": 1793990485.3389115,
+    "seen": 1793992281.6733255,
+    "ast_hash": "597c2b8e7e07c040bc42cfa010672675",
+    "semantic_hash": ""
   },
   "app/src/lib/utils.ts": {
     "mtime": 1792255321.597667,
@@ -396,9 +396,9 @@
     "semantic_hash": "fe4645d74fe6034b2e637fa8b1958087"
   },
   "app/src/pages/Home.tsx": {
-    "mtime": 1793760791.586012,
-    "seen": 1793760900.5263097,
-    "ast_hash": "e5d203d037a3a152d337faab310135f5",
+    "mtime": 1793990679.164736,
+    "seen": 1793992281.6733596,
+    "ast_hash": "bc3e5fe63573575ce81f8958e7740a1b",
     "semantic_hash": ""
   },
   "app/src/pages/Login.tsx": {
@@ -450,15 +450,15 @@
     "semantic_hash": "bda36de3fc01f25ebfd62c335624a9f2"
   },
   "backend/db.js": {
-    "mtime": 1793758400.6140718,
-    "seen": 1793758751.6766193,
-    "ast_hash": "a25a7b76054a4c71a1a1aa78b9e5f8de",
+    "mtime": 1793986546.4980896,
+    "seen": 1793986838.5109324,
+    "ast_hash": "06edbda7491051ff2c4b2353274a7358",
     "semantic_hash": ""
   },
   "backend/index.js": {
-    "mtime": 1793758401.896564,
-    "seen": 1793758751.6766315,
-    "ast_hash": "6bb4320e3c7a34a48b11e6753cd010ff",
+    "mtime": 1793991814.934662,
+    "seen": 1793992281.6734352,
+    "ast_hash": "026e9c9fc197ab37f589cbc13fcf2bf1",
     "semantic_hash": ""
   },
   "backend/package.json": {
@@ -468,16 +468,16 @@
     "semantic_hash": "8b455b45994cafe62f51dbfa1c940279"
   },
   "backend/test/api.test.js": {
-    "mtime": 1793549465.6668224,
-    "seen": 1793748457.913013,
-    "ast_hash": "ae1209bc519100ea25ce1fe2041be38e",
-    "semantic_hash": "ae1209bc519100ea25ce1fe2041be38e"
+    "mtime": 1793990979.1152222,
+    "seen": 1793992281.6734529,
+    "ast_hash": "9ac61cdeb24cc28b7bb64da50e74bcfc",
+    "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1793583963.9416304,
-    "seen": 1793748457.9130204,
-    "ast_hash": "2f54d3dffa729fe93ef6c62e716f09d3",
-    "semantic_hash": "2f54d3dffa729fe93ef6c62e716f09d3"
+    "mtime": 1793821862.5331168,
+    "seen": 1793986838.5109673,
+    "ast_hash": "d21cae420b0a5a6e8dc5e9a190aaafe9",
+    "semantic_hash": ""
   },
   "app/README.md": {
     "mtime": 1792255321.4751136,
@@ -519,6 +519,30 @@
     "mtime": 1793759683.7843096,
     "seen": 1793760900.5264642,
     "ast_hash": "9046f16f76715c69205ebca8c5964b39",
+    "semantic_hash": ""
+  },
+  "dev server windows.ps1": {
+    "mtime": 1793821862.5361073,
+    "seen": 1793986838.5109603,
+    "ast_hash": "605d129d318a349fe38e2a9665ab35b3",
+    "semantic_hash": ""
+  },
+  "backend/20261104152234094.txt": {
+    "mtime": 1793983435.2864385,
+    "seen": 1793986838.5109966,
+    "ast_hash": "ed076287532e86365e841e92bfc50d8c",
+    "semantic_hash": ""
+  },
+  "flaws.md": {
+    "mtime": 1793986693.8980632,
+    "seen": 1793986838.5110018,
+    "ast_hash": "3792c26cff633520b3ff02284f19f22b",
+    "semantic_hash": ""
+  },
+  "app/src/pages/Account.tsx": {
+    "mtime": 1793992137.0557046,
+    "seen": 1793992281.6733515,
+    "ast_hash": "c5d35125edbe5d81e7f7b7c4a6c59710",
     "semantic_hash": ""
   },
   "app/package-lock.json": {

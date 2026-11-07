@@ -16,9 +16,15 @@ async function initDb() {
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
       username TEXT UNIQUE,
-      password TEXT
+      password TEXT,
+      name TEXT
     )
   `);
+
+  const userColumns = await db.all('PRAGMA table_info(users)');
+  if (!userColumns.some(col => col.name === 'name')) {
+    await db.exec('ALTER TABLE users ADD COLUMN name TEXT');
+  }
 
   // Create Progress table
   await db.exec(`
